@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/customer_provider.dart';
+import '../services/backup_service.dart';
 import 'customer_detail_screen.dart';
 
 class CustomerScreen extends ConsumerStatefulWidget {
@@ -15,11 +16,91 @@ class CustomerScreen extends ConsumerStatefulWidget {
 class _CustomerScreenState extends ConsumerState<CustomerScreen> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
+  bool isProcessing = false;
 
   @override
   void dispose() {
     searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _createBackup() async {
+    setState(() => isProcessing = true);
+
+    try {
+      await BackupService.createBackup();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backup operation completed.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Restore Backup'),
+          content: const Text(
+            'Restoring will replace all existing customers '
+            'and transactions with backup data. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Restore'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => isProcessing = true);
+
+    try {
+      await BackupService.restoreBackup();
+
+      ref.invalidate(customersProvider);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backup restored successfully!'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Restore Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isProcessing = false);
+      }
+    }
   }
 
   @override
@@ -31,9 +112,46 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
         title: const Text('Customers'),
         backgroundColor: const Color(0xFF176B55),
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            enabled: !isProcessing,
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'backup') {
+                _createBackup();
+              } else if (value == 'restore') {
+                _restoreBackup();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'backup',
+                child: Row(
+                  children: [
+                    Icon(Icons.backup),
+                    SizedBox(width: 10),
+                    Text('Backup Data'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'restore',
+                child: Row(
+                  children: [
+                    Icon(Icons.restore),
+                    SizedBox(width: 10),
+                    Text('Restore Data'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
+          if (isProcessing)
+            const LinearProgressIndicator(),
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
@@ -155,7 +273,9 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF176B55),
         foregroundColor: Colors.white,
-        onPressed: () => _showAddCustomerDialog(context),
+        onPressed: isProcessing
+            ? null
+            : () => _showAddCustomerDialog(context),
         icon: const Icon(Icons.person_add),
         label: const Text('Add Customer'),
       ),
@@ -259,4 +379,3 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
     }
   }
 }
-

@@ -1,5 +1,6 @@
 # KhataBook Flutter App
 
+
 A Flutter application for managing customer accounts and transactions.
 
 ## Features

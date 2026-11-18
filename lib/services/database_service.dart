@@ -25,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -51,11 +51,31 @@ class DatabaseService {
               REFERENCES customers (id)
           )
         ''');
+
+        await _createIndexes(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createIndexes(db);
+        }
       },
     );
   }
 
-  // Add Customer
+  Future<void> _createIndexes(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_transactions_customer_id
+      ON transactions (customer_id)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_transactions_date
+      ON transactions (date)
+    ''');
+  }
+
   Future<int> addCustomer(String name, String phone) async {
     final db = await database;
 
@@ -66,7 +86,6 @@ class DatabaseService {
     });
   }
 
-  // Get All Customers
   Future<List<Map<String, dynamic>>> getCustomers() async {
     final db = await database;
 
@@ -76,7 +95,6 @@ class DatabaseService {
     );
   }
 
-  // Add Transaction
   Future<int> addTransaction({
     required int customerId,
     required String type,
@@ -102,7 +120,6 @@ class DatabaseService {
     });
   }
 
-  // Get Customer Transactions
   Future<List<Map<String, dynamic>>> getCustomerTransactions(
     int customerId,
   ) async {
@@ -116,7 +133,6 @@ class DatabaseService {
     );
   }
 
-  // Get Customer Balance
   Future<double> getCustomerBalance(int customerId) async {
     final db = await database;
 
@@ -142,7 +158,6 @@ class DatabaseService {
     return (result.first['balance'] as num).toDouble();
   }
 
-  // Get Dashboard Summary
   Future<Map<String, double>> getDashboardSummary() async {
     final db = await database;
 
@@ -182,7 +197,6 @@ class DatabaseService {
     };
   }
 
-  // Get Top Debtors
   Future<List<Map<String, dynamic>>> getTopDebtors({
     int limit = 5,
   }) async {
@@ -218,7 +232,6 @@ class DatabaseService {
     );
   }
 
-  // Get All Transactions
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
     final db = await database;
 
@@ -233,7 +246,6 @@ class DatabaseService {
     ''');
   }
 
-  // Get Recent Transactions
   Future<List<Map<String, dynamic>>> getRecentTransactions({
     int limit = 5,
   }) async {
@@ -254,7 +266,6 @@ class DatabaseService {
     );
   }
 
-  // Get Monthly Transaction Totals
   Future<List<Map<String, dynamic>>> getMonthlyTotals() async {
     final db = await database;
 

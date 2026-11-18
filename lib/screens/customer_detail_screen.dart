@@ -182,14 +182,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     setState(() => isExporting = true);
 
     try {
-      final file = await StatementService.generatePdf(
+      await StatementService.generatePdf(
         customerName: widget.customer['name'].toString(),
         phone: widget.customer['phone'].toString(),
         balance: balance,
         transactions: transactions,
       );
-
-      await StatementService.shareFile(file);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,7 +195,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => isExporting = false);
+      if (mounted) {
+        setState(() => isExporting = false);
+      }
     }
   }
 
@@ -240,7 +240,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => isExporting = false);
+      if (mounted) {
+        setState(() => isExporting = false);
+      }
     }
   }
 
@@ -331,10 +333,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     ],
                   ),
                 ),
-
                 if (isExporting)
                   const LinearProgressIndicator(),
-
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: loadCustomerData,
@@ -398,9 +398,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 20),
-
                                 const Text(
                                   'Transaction History',
                                   style: TextStyle(
@@ -408,9 +406,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-
                                 const SizedBox(height: 10),
-
                                 if (transactionsWithBalance.isEmpty)
                                   const Card(
                                     child: Padding(
@@ -422,7 +418,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                       ),
                                     ),
                                   ),
-
                                 ...transactionsWithBalance.map((transaction) {
                                   final type =
                                       transaction['type'].toString();

@@ -6,9 +6,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:printing/printing.dart';
 
 class StatementService {
-  static Future<File> generatePdf({
+  static Future<void> generatePdf({
     required String customerName,
     required String phone,
     required double balance,
@@ -72,15 +73,10 @@ class StatementService {
       ),
     );
 
-    final directory = await getApplicationDocumentsDirectory();
-
-    final file = File(
-      '${directory.path}/statement_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: 'KhataBook_Statement.pdf',
     );
-
-    await file.writeAsBytes(await pdf.save());
-
-    return file;
   }
 
   static Future<File> generateJpg(Uint8List imageBytes) async {
