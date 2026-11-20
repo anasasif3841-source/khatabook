@@ -1,58 +1,33 @@
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/database_service.dart';
 
-class MonthlyChart extends StatefulWidget {
+import '../providers/dashboard_providers.dart';
+
+class MonthlyChart extends ConsumerWidget {
   const MonthlyChart({super.key});
 
-  @override
-  State<MonthlyChart> createState() => _MonthlyChartState();
-}
-
-class _MonthlyChartState extends State<MonthlyChart> {
-  List<Map<String, dynamic>> monthlyData = [];
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    loadMonthlyData();
-  }
-
-  Future<void> loadMonthlyData() async {
-    try {
-      final data = await DatabaseService.instance.getMonthlyTotals();
-
-      if (!mounted) return;
-
-      setState(() {
-        monthlyData = data;
-        isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  List<Map<String, dynamic>> getChartData() {
+  List<Map<String, dynamic>> getChartData(
+    List<Map<String, dynamic>> monthlyData,
+  ) {
     final now = DateTime.now();
 
     return List.generate(6, (index) {
-      final month = DateTime(now.year, now.month - 5 + index, 1);
+      final month = DateTime(
+        now.year,
+        now.month - 5 + index,
+        1,
+      );
 
       final key =
           '${month.year}-${month.month.toString().padLeft(2, '0')}';
 
-      final record = monthlyData.where(
-        (item) => item['month'] == key,
+      final matchingRecords = monthlyData.where(
+        (item) => item['month']?.toString() == key,
       );
 
-      if (record.isEmpty) {
+      if (matchingRecords.isEmpty) {
         return {
           'month': month,
           'gave': 0.0,
@@ -60,29 +35,25 @@ class _MonthlyChartState extends State<MonthlyChart> {
         };
       }
 
+      final record = matchingRecords.first;
+
       return {
         'month': month,
-        'gave': (record.first['gave_total'] as num).toDouble(),
-        'got': (record.first['got_total'] as num).toDouble(),
+        'gave': (record['total_gave'] as num).toDouble(),
+        'got': (record['total_got'] as num).toDouble(),
       };
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    final data = getChartData();
+  Widget buildChart(List<Map<String, dynamic>> monthlyData) {
+    final data = getChartData(monthlyData);
 
     final maxAmount = data.fold<double>(
       0,
       (previous, item) {
         final gave = item['gave'] as double;
         final got = item['got'] as double;
+
         return [
           previous,
           gave,
@@ -169,10 +140,14 @@ class _MonthlyChartState extends State<MonthlyChart> {
                   }),
                   titlesData: FlTitlesData(
                     topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                      sideTitles: SideTitles(
+                        showTitles: false,
+                      ),
                     ),
                     rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                      sideTitles: SideTitles(
+                        showTitles: false,
+                      ),
                     ),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
@@ -183,7 +158,9 @@ class _MonthlyChartState extends State<MonthlyChart> {
                             value >= 1000
                                 ? '${(value / 1000).toStringAsFixed(0)}k'
                                 : value.toStringAsFixed(0),
-                            style: const TextStyle(fontSize: 10),
+                            style: const TextStyle(
+                              fontSize: 10,
+                            ),
                           );
                         },
                       ),
@@ -203,24 +180,39 @@ class _MonthlyChartState extends State<MonthlyChart> {
                               data[index]['month'] as DateTime;
 
                           const months = [
-                            'Jan', 'Feb', 'Mar', 'Apr',
-                            'May', 'Jun', 'Jul', 'Aug',
-                            'Sep', 'Oct', 'Nov', 'Dec'
+                            'Jan',
+                            'Feb',
+                            'Mar',
+                            'Apr',
+                            'May',
+                            'Jun',
+                            'Jul',
+                            'Aug',
+                            'Sep',
+                            'Oct',
+                            'Nov',
+                            'Dec',
                           ];
 
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               months[month.month - 1],
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(
+                                fontSize: 11,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  gridData: const FlGridData(show: true),
+                  borderData: FlBorderData(
+                    show: false,
+                  ),
+                  gridData: const FlGridData(
+                    show: true,
+                  ),
                   barTouchData: BarTouchData(
                     enabled: true,
                   ),
@@ -230,6 +222,50 @@ class _MonthlyChartState extends State<MonthlyChart> {
           ],
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final monthlyAsync = ref.watch(monthlyTotalsProvider);
+
+    return monthlyAsync.when(
+      loading: () => const SizedBox(
+        height: 280,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (error, stackTrace) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 35,
+              ),
+              const SizedBox(height: 10),
+              const Text('Unable to load monthly chart'),
+              const SizedBox(height: 10),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () {
+                  ref.invalidate(monthlyTotalsProvider);
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (monthlyData) => buildChart(monthlyData),
     );
   }
 }

@@ -1,15 +1,14 @@
 
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:pdf/widgets.dart' as pw;
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class StatementService {
-  static Future<void> generatePdf({
+  static Future<Uint8List> generatePdf({
     required String customerName,
     required String phone,
     required double balance,
@@ -73,38 +72,139 @@ class StatementService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'KhataBook_Statement.pdf',
+    return Uint8List.fromList(await pdf.save());
+  }
+
+  static Future<void> sharePdf(Uint8List bytes) async {
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'khatabook_statement.pdf',
     );
   }
 
-  static Future<File> generateJpg(Uint8List imageBytes) async {
+  static Future<Uint8List> generateJpg(Uint8List imageBytes) async {
     final decodedImage = img.decodeImage(imageBytes);
 
     if (decodedImage == null) {
       throw Exception('Could not create statement image');
     }
 
-    final jpgBytes = img.encodeJpg(decodedImage, quality: 90);
-
-    final directory = await getApplicationDocumentsDirectory();
-
-    final file = File(
-      '${directory.path}/statement_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    return Uint8List.fromList(
+      img.encodeJpg(decodedImage, quality: 90),
     );
-
-    await file.writeAsBytes(jpgBytes);
-
-    return file;
   }
 
-  static Future<void> shareFile(File file) async {
+  static Future<void> shareJpg(Uint8List bytes) async {
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path)],
+        files: [
+          XFile.fromData(
+            bytes,
+            name: 'khatabook_statement.jpg',
+            mimeType: 'image/jpeg',
+          ),
+        ],
         text: 'KhataBook Customer Statement',
       ),
     );
+  }
+
+  static String normalizePakistaniPhone(String phone) {
+    var number = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+
+    if (number.startsWith('+')) {
+      number = number.substring(1);
+    }
+
+    if (number.startsWith('03') && number.length == 11) {
+      return '92${number.substring(1)}';
+    }
+
+    if (number.startsWith('0092')) {
+      return number.substring(2);
+    }
+
+    if (number.startsWith('92')) {
+      return number;
+    }
+
+    if (number.startsWith('3') && number.length == 10) {
+      return '92$number';
+    }
+
+    throw Exception('Invalid Pakistani phone number');
+  }
+
+  static String createReminderMessage({
+    required String customerName,
+    required double balance,
+  }) {
+    final amount = balance.abs().toStringAsFixed(0);
+
+    if (balance > 0) {
+      return 'Assalam-o-Alaikum $customerName, '
+          'aap ke zimme Rs. $amount baqi hain. '
+          'Meharbani farma kar payment kar dein. Shukriya.';
+    }
+
+    if (balance < 0) {
+      return 'Assalam-o-Alaikum $customerName, '
+          'hamare zimme aap ke Rs. $amount baqi hain. '
+          'Shukriya.';
+    }
+
+    return 'Assalam-o-Alaikum $customerName, '
+        'aap ka KhataBook balance clear hai. Shukriya.';
+  }
+
+  static Future<void> sendWhatsApp({
+    required String phone,
+    required String customerName,
+    required double balance,
+  }) async {
+    final number = normalizePakistaniPhone(phone);
+    final message = createReminderMessage(
+      customerName: customerName,
+      balance: balance,
+    );
+
+    final uri = Uri.parse(
+      'https://wa.me/$number?text=${Uri.encodeComponent(message)}',
+    );
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched) {
+      throw Exception('Could not open WhatsApp');
+    }
+  }
+
+  static Future<void> sendSms({
+    required String phone,
+    required String customerName,
+    required double balance,
+  }) async {
+    final number = normalizePakistaniPhone(phone);
+    final message = createReminderMessage(
+      customerName: customerName,
+      balance: balance,
+    );
+
+    final uri = Uri(
+      scheme: 'sms',
+      path: '+$number',
+      queryParameters: {
+        'body': message,
+      },
+    );
+
+    final launched = await launchUrl(uri);
+
+    if (!launched) {
+      throw Exception('Could not open SMS app');
+    }
   }
 }

@@ -1,14 +1,19 @@
 
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'screens/customer_screen.dart';
 import 'screens/add_transaction_screen.dart';
-import 'services/database_service.dart';
 import 'widgets/monthly_chart.dart';
+
+import 'services/backup_service.dart';
+
+import 'providers/dashboard_providers.dart';
+import 'providers/customer_providers.dart';
+import 'providers/transaction_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,100 +38,128 @@ class KhataBookApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'KhataBook',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
       home: const DashboardScreen(),
     );
   }
 }
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  final database = DatabaseService.instance;
-
-  Map<String, double> summary = {
-    'receivable': 0,
-    'payable': 0,
-  };
-
-  List<Map<String, dynamic>> recentTransactions = [];
-  List<Map<String, dynamic>> topDebtors = [];
-
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    loadDashboard();
-  }
-
-  Future<void> loadDashboard() async {
-    try {
-      final results = await Future.wait([
-        database.getDashboardSummary(),
-        database.getRecentTransactions(),
-        database.getTopDebtors(),
-      ]);
-
-      if (!mounted) return;
-
-      setState(() {
-        summary = results[0] as Map<String, double>;
-        recentTransactions =
-            results[1] as List<Map<String, dynamic>>;
-        topDebtors =
-            results[2] as List<Map<String, dynamic>>;
-        isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading dashboard: $e')),
-      );
-    }
-  }
-
-  Future<void> openCustomers() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CustomerScreen(),
-      ),
-    );
-
-    await loadDashboard();
-  }
-
-  Future<void> openAddEntry() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AddTransactionScreen(),
-      ),
-    );
-
-    await loadDashboard();
-  }
 
   String formatAmount(dynamic amount) {
     return 'Rs. ${(amount as num).toStringAsFixed(0)}';
   }
 
+  void refreshAll(WidgetRef ref) {
+    ref.invalidate(dashboardSummaryProvider);
+    ref.invalidate(topDebtorsProvider);
+    ref.invalidate(recentTransactionsProvider);
+    ref.invalidate(monthlyTotalsProvider);
+    ref.invalidate(customersProvider);
+    ref.invalidate(customerTransactionsProvider);
+    ref.invalidate(customerBalanceProvider);
+  }
+
+  Future<void> backupData(BuildContext context) async {
+    try {
+      await BackupService.exportBackup();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backup process completed.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Backup failed: $error'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> restoreData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Restore Backup?'),
+          content: const Text(
+            'Restoring a backup will replace your current '
+            'customers and transactions. This action cannot '
+            'be undone. Do you want to continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await BackupService.importBackup();
+
+      refreshAll(ref);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Restore process completed.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Restore failed: $error'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(dashboardSummaryProvider);
+    final debtorsAsync = ref.watch(topDebtorsProvider);
+    final transactionsAsync = ref.watch(recentTransactionsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -137,102 +170,194 @@ class _DashboardScreenState extends State<DashboardScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            onPressed: loadDashboard,
+            onPressed: () {
+              refreshAll(ref);
+            },
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: loadDashboard,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  const Text(
-                    'Welcome Back!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          refreshAll(ref);
+
+          await Future.wait([
+            ref.read(dashboardSummaryProvider.future),
+            ref.read(topDebtorsProvider.future),
+            ref.read(recentTransactionsProvider.future),
+            ref.read(monthlyTotalsProvider.future),
+          ]);
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text(
+              'Welcome Back!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            summaryAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (error, stack) => Card(
+                child: ListTile(
+                  title: const Text('Unable to load summary'),
+                  subtitle: Text(error.toString()),
+                  trailing: IconButton(
+                    onPressed: () {
+                      ref.invalidate(dashboardSummaryProvider);
+                    },
+                    icon: const Icon(Icons.refresh),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: balanceCard(
-                          'You Will Get',
-                          formatAmount(summary['receivable'] ?? 0),
-                          Colors.green,
-                          Icons.arrow_downward,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: balanceCard(
-                          'You Will Give',
-                          formatAmount(summary['payable'] ?? 0),
-                          Colors.red,
-                          Icons.arrow_upward,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
-                  const Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: actionCard(
-                          'Customers',
-                          Icons.people,
-                          Colors.blue,
-                          openCustomers,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: actionCard(
-                          'Add Entry',
-                          Icons.add_circle,
-                          Colors.orange,
-                          openAddEntry,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
-                  const MonthlyChart(),
-                  const SizedBox(height: 25),
-                  const Text(
-                    'Top Debtors',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (topDebtors.isEmpty)
-                    const Card(
-                      child: ListTile(
-                        title: Text('No outstanding balances yet'),
+                ),
+              ),
+              data: (summary) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: balanceCard(
+                        'You Will Get',
+                        formatAmount(summary['receivable'] ?? 0),
+                        Colors.green,
+                        Icons.arrow_downward,
                       ),
                     ),
-                  ...topDebtors.map((customer) {
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: balanceCard(
+                        'You Will Give',
+                        formatAmount(summary['payable'] ?? 0),
+                        Colors.red,
+                        Icons.arrow_upward,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Quick Actions',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: actionCard(
+                    context,
+                    'Customers',
+                    Icons.people,
+                    Colors.blue,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CustomerScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: actionCard(
+                    context,
+                    'Add Entry',
+                    Icons.add_circle,
+                    Colors.orange,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddTransactionScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: actionCard(
+                    context,
+                    'Backup Data',
+                    Icons.cloud_download,
+                    Colors.green,
+                    () => backupData(context),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: actionCard(
+                    context,
+                    'Restore Data',
+                    Icons.cloud_upload,
+                    Colors.deepPurple,
+                    () => restoreData(context, ref),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 25),
+
+            const MonthlyChart(),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Top Debtors',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            debtorsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (error, stack) => Text(
+                'Error loading debtors: $error',
+              ),
+              data: (debtors) {
+                if (debtors.isEmpty) {
+                  return const Card(
+                    child: ListTile(
+                      title: Text('No outstanding balances yet'),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: debtors.map((customer) {
                     return Card(
                       child: ListTile(
                         leading: const CircleAvatar(
                           child: Icon(Icons.person),
                         ),
                         title: Text(customer['name'].toString()),
-                        subtitle: Text(customer['phone'].toString()),
+                        subtitle: Text(
+                          customer['phone']?.toString() ?? '',
+                        ),
                         trailing: Text(
                           formatAmount(customer['balance']),
                           style: const TextStyle(
@@ -242,23 +367,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     );
-                  }),
-                  const SizedBox(height: 25),
-                  const Text(
-                    'Recent Transactions',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  }).toList(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Recent Transactions',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            transactionsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (error, stack) => Text(
+                'Error loading transactions: $error',
+              ),
+              data: (transactions) {
+                if (transactions.isEmpty) {
+                  return const Card(
+                    child: ListTile(
+                      title: Text('No transactions yet'),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (recentTransactions.isEmpty)
-                    const Card(
-                      child: ListTile(
-                        title: Text('No transactions yet'),
-                      ),
-                    ),
-                  ...recentTransactions.map((transaction) {
+                  );
+                }
+
+                return Column(
+                  children: transactions.map((transaction) {
                     final isGave = transaction['type'] == 'gave';
 
                     return Card(
@@ -293,10 +435,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     );
-                  }),
-                ],
-              ),
+                  }).toList(),
+                );
+              },
             ),
+          ],
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         selectedItemColor: Colors.blue,
@@ -322,7 +467,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
         onTap: (index) {
           if (index == 1) {
-            openCustomers();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CustomerScreen(),
+              ),
+            );
           }
         },
       ),
@@ -362,6 +512,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget actionCard(
+    BuildContext context,
     String title,
     IconData icon,
     Color color,
@@ -373,7 +524,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
