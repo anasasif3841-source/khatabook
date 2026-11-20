@@ -213,7 +213,7 @@ The release page should contain the latest tested `app-release.apk` file.
 
 ## Live Demo
 
-[Open KhataBook Web Demo](https://friendly-dodol-4fbea7.netlify.app/)
+[Open KhataBook Web Demo](https://cheery-lolly-779dff.netlify.app)
 
 *Note: The web demo is provided for demonstration purposes. The Android release APK is the primary mobile application build.*
 
