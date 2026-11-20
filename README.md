@@ -152,11 +152,11 @@ Add actual screenshots captured from the application in the following locations.
 
 ### Light Theme
 
-![KhataBook Light Theme](assets/screenshots/light.png)
+![KhataBook Light Theme](screenshots/lightmood.png)
 
 ### Dark Theme
 
-![KhataBook Dark Theme](assets/screenshots/dark.png)
+![KhataBook Dark Theme](screenshots/darkmood.png)
 
 ## Installation and Setup
 
@@ -218,8 +218,7 @@ The release page should contain the latest tested `app-release.apk` file.
 *Note: The web demo is provided for demonstration purposes. The Android release APK is the primary mobile application build.*
 
 ## Demo Video
-
-Add the link to the 2–3 minute application demonstration video here.
+(https://drive.google.com/file/d/14rY2fJhTeJCzPC_w9aOVzGqt__d8_qR3/view?usp=sharing).
 
 ## GitHub Repository
 
