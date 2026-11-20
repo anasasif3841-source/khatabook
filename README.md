@@ -156,7 +156,7 @@ Add actual screenshots captured from the application in the following locations.
 
 ### Dark Theme
 
-![KhataBook Dark Theme](https://drive.google.com/file/d/1hISDtxUk62cPH1MiT2_SPjs1uGl7Cy2Z/view?usp=sharing)
+![KhataBook Dark Theme](https://github.com/anasasif3841-source/khatabook/blob/main/screenshots/dark%20mood%20(1).JPG)
 
 ## Installation and Setup
 
