@@ -152,11 +152,11 @@ Add actual screenshots captured from the application in the following locations.
 
 ### Light Theme
 
-![KhataBook Light Theme](screenshots/lightmood.png)
+![KhataBook Light Theme](https://drive.google.com/file/d/1dZvEMWd7niKerhEjq-cPviBqPBjovhMt/view?usp=sharing)
 
 ### Dark Theme
 
-![KhataBook Dark Theme](screenshots/darkmood.png)
+![KhataBook Dark Theme](https://drive.google.com/file/d/1hISDtxUk62cPH1MiT2_SPjs1uGl7Cy2Z/view?usp=sharing)
 
 ## Installation and Setup
 
