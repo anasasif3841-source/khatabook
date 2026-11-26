@@ -148,15 +148,13 @@ Stores transaction records, including:
 
 ## Screenshots
 
-Add actual screenshots captured from the application in the following locations.
-
 ### Light Theme
 
-![KhataBook Light Theme](https://github.com/anasasif3841-source/khatabook/blob/main/screenshots/light%20mood.JPG)
+![KhataBook Light Theme](screenshots/light.jpg)
 
 ### Dark Theme
 
-![KhataBook Dark Theme](https://github.com/anasasif3841-source/khatabook/blob/main/screenshots/dark%20mood%20(1).JPG)
+![KhataBook Dark Theme](screenshots/dark.jpg)
 
 ## Installation and Setup
 
@@ -205,11 +203,11 @@ build/app/outputs/flutter-apk/app-release.apk
 
 ## APK Download
 
-**GitHub Release v1.0.0**
+**GitHub Release v1.1.0**
 
-[Download KhataBook APK from GitHub Releases](https://github.com/anasasif3841-source/khatabook/releases/tag/v1.0.0)
+[Download KhataBook APK](https://github.com/anasasif3841-source/khatabook/releases/tag/v1.1.0)
 
-The release page should contain the latest tested `app-release.apk` file.
+The latest tested `app-release.apk` is attached to this release.
 
 ## Live Demo
 
@@ -218,7 +216,8 @@ The release page should contain the latest tested `app-release.apk` file.
 *Note: The web demo is provided for demonstration purposes. The Android release APK is the primary mobile application build.*
 
 ## Demo Video
-(https://drive.google.com/file/d/14rY2fJhTeJCzPC_w9aOVzGqt__d8_qR3/view?usp=sharing).
+
+[Watch KhataBook Demo Video](https://drive.google.com/file/d/14rY2fJhTeJCzPC_w9aOVzGqt__d8_qR3/view?usp=sharing)
 
 ## GitHub Repository
 
